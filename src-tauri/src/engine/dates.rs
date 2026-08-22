@@ -2,14 +2,34 @@ use super::i18n::Keywords;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Try to evaluate a date arithmetic expression
-/// "today + 17 days" -> "9/7/2026"
-/// "hoje + 17 dias" -> "07/09/2026"
+/// "today + 17 days" -> "21/08/2026"
+/// "now" -> "21/08/2026 14:30:05"
+/// "08/21/2026 to BR" -> "21/08/2026"
 pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<String, String>> {
     let lower = expr.to_lowercase();
     let trimmed = lower.trim();
 
-    // Check for "now"/"agora" -> current unix timestamp
-    if trimmed == "now" || trimmed == "agora" || trimmed == "epoch" || trimmed == "timestamp" {
+    // Check for "now"/"agora" -> current date and time
+    if trimmed == "now" || trimmed == "agora" {
+        let secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let date = unix_days_to_date(secs / 86400);
+        let time_secs = secs % 86400;
+        let hours = time_secs / 3600;
+        let minutes = (time_secs % 3600) / 60;
+        let seconds = time_secs % 60;
+        let formatted = if is_pt(keywords) {
+            format!("{:02}/{:02}/{} {:02}:{:02}:{:02}", date.2, date.1, date.0, hours, minutes, seconds)
+        } else {
+            format!("{}/{}/{} {:02}:{:02}:{:02}", date.1, date.2, date.0, hours, minutes, seconds)
+        };
+        return Some(Ok(formatted));
+    }
+
+    // Check for "epoch"/"timestamp" -> raw unix timestamp
+    if trimmed == "epoch" || trimmed == "timestamp" {
         let secs = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -24,6 +44,11 @@ pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<Str
 
     // Check for "tounix(date)" or "toepoch(date)" or "paraunix(date)" or "paraepoch(date)"
     if let Some(result) = try_to_unix(trimmed, expr) {
+        return Some(result);
+    }
+
+    // Check for date format conversion: "<date> to BR", "<date> to US", "<date> to ISO"
+    if let Some(result) = try_date_format_conversion(expr, keywords) {
         return Some(result);
     }
 
@@ -99,6 +124,37 @@ pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<Str
         add_months(today, number)
     } else if keywords.years.iter().any(|k| unit == *k) {
         add_years(today, number)
+    } else if keywords.hours.iter().any(|k| unit == *k) {
+        // hours — return date + time
+        let secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let new_secs = secs + number * 3600;
+        let date = unix_days_to_date(new_secs / 86400);
+        let time_secs = new_secs % 86400;
+        let h = time_secs / 3600;
+        let m = (time_secs % 3600) / 60;
+        if is_pt(keywords) {
+            return Some(Ok(format!("{:02}/{:02}/{} {:02}:{:02}", date.2, date.1, date.0, h, m)));
+        } else {
+            return Some(Ok(format!("{}/{}/{} {:02}:{:02}", date.1, date.2, date.0, h, m)));
+        }
+    } else if keywords.minutes.iter().any(|k| unit == *k) {
+        let secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+        let new_secs = secs + number * 60;
+        let date = unix_days_to_date(new_secs / 86400);
+        let time_secs = new_secs % 86400;
+        let h = time_secs / 3600;
+        let m = (time_secs % 3600) / 60;
+        if is_pt(keywords) {
+            return Some(Ok(format!("{:02}/{:02}/{} {:02}:{:02}", date.2, date.1, date.0, h, m)));
+        } else {
+            return Some(Ok(format!("{}/{}/{} {:02}:{:02}", date.1, date.2, date.0, h, m)));
+        }
     } else {
         let msg = if is_pt(keywords) {
             format!("Unidade de tempo desconhecida: {}", unit)
@@ -109,6 +165,157 @@ pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<Str
     };
 
     Some(Ok(format_date(result.0, result.1, result.2, keywords)))
+}
+
+// === Date format conversion ===
+
+fn try_date_format_conversion(expr: &str, keywords: &Keywords) -> Option<Result<String, String>> {
+    let lower = expr.to_lowercase();
+
+    // Patterns: "<date> to BR", "<date> to US", "<date> to ISO", "<date> em BR", etc.
+    for conv_kw in keywords.conversion.iter() {
+        let patterns = [
+            format!(" {} br", conv_kw),
+            format!(" {} us", conv_kw),
+            format!(" {} iso", conv_kw),
+            format!(" {} dd/mm/yyyy", conv_kw),
+            format!(" {} mm/dd/yyyy", conv_kw),
+            format!(" {} yyyy-mm-dd", conv_kw),
+        ];
+
+        for pattern in &patterns {
+            if let Some(pos) = lower.rfind(pattern.as_str()) {
+                let date_part = expr[..pos].trim();
+                let target = pattern.split_whitespace().last().unwrap();
+
+                // Parse the input date (with optional time)
+                if let Some((year, month, day, time)) = parse_date_flexible(date_part) {
+                    let formatted = match target {
+                        "br" | "dd/mm/yyyy" => {
+                            let base = format!("{:02}/{:02}/{}", day, month, year);
+                            if let Some((h, m, s)) = time {
+                                format!("{} {:02}:{:02}:{:02}", base, h, m, s)
+                            } else {
+                                base
+                            }
+                        }
+                        "us" | "mm/dd/yyyy" => {
+                            let base = format!("{:02}/{:02}/{}", month, day, year);
+                            if let Some((h, m, s)) = time {
+                                format!("{} {:02}:{:02}:{:02}", base, h, m, s)
+                            } else {
+                                base
+                            }
+                        }
+                        "iso" | "yyyy-mm-dd" => {
+                            let base = format!("{}-{:02}-{:02}", year, month, day);
+                            if let Some((h, m, s)) = time {
+                                format!("{}T{:02}:{:02}:{:02}", base, h, m, s)
+                            } else {
+                                base
+                            }
+                        }
+                        _ => return None,
+                    };
+                    return Some(Ok(formatted));
+                } else {
+                    // Not a valid date — don't intercept, let other handlers try
+                    continue;
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Parse a date string flexibly, returning (year, month, day, Option<(hour, min, sec)>)
+fn parse_date_flexible(s: &str) -> Option<(i32, u32, u32, Option<(u32, u32, u32)>)> {
+    let s = s.trim();
+
+    // Split date and time
+    let (date_str, time_str) = if s.contains('T') {
+        let parts: Vec<&str> = s.splitn(2, 'T').collect();
+        (parts[0], Some(parts[1]))
+    } else if let Some(space_pos) = s.rfind(' ') {
+        let potential_time = &s[space_pos + 1..];
+        if potential_time.contains(':') {
+            (&s[..space_pos], Some(potential_time))
+        } else {
+            (s, None)
+        }
+    } else {
+        (s, None)
+    };
+
+    // Parse date
+    let (year, month, day) = parse_date_part(date_str)?;
+
+    // Parse time
+    let time = if let Some(t) = time_str {
+        parse_time_part(t)
+    } else {
+        None
+    };
+
+    Some((year, month, day, time))
+}
+
+fn parse_date_part(s: &str) -> Option<(i32, u32, u32)> {
+    let parts: Vec<&str> = if s.contains('-') {
+        s.split('-').collect()
+    } else if s.contains('/') {
+        s.split('/').collect()
+    } else {
+        return None;
+    };
+
+    if parts.len() != 3 {
+        return None;
+    }
+
+    if parts[0].len() == 4 {
+        // YYYY-MM-DD
+        let y: i32 = parts[0].parse().ok()?;
+        let m: u32 = parts[1].parse().ok()?;
+        let d: u32 = parts[2].parse().ok()?;
+        Some((y, m, d))
+    } else if parts[2].len() == 4 {
+        let first: u32 = parts[0].parse().ok()?;
+        let second: u32 = parts[1].parse().ok()?;
+        let y: i32 = parts[2].parse().ok()?;
+
+        if first > 12 {
+            // DD/MM/YYYY
+            Some((y, second, first))
+        } else if second > 12 {
+            // MM/DD/YYYY
+            Some((y, first, second))
+        } else {
+            // Ambiguous — assume DD/MM/YYYY
+            Some((y, second, first))
+        }
+    } else {
+        None
+    }
+}
+
+fn parse_time_part(s: &str) -> Option<(u32, u32, u32)> {
+    let s = s.trim().trim_end_matches("UTC").trim_end_matches("utc").trim();
+    let parts: Vec<&str> = s.split(':').collect();
+    match parts.len() {
+        2 => {
+            let h: u32 = parts[0].parse().ok()?;
+            let m: u32 = parts[1].parse().ok()?;
+            Some((h, m, 0))
+        }
+        3 => {
+            let h: u32 = parts[0].parse().ok()?;
+            let m: u32 = parts[1].parse().ok()?;
+            let s: u32 = parts[2].parse::<f64>().ok()? as u32; // handle "05.000"
+            Some((h, m, s))
+        }
+        _ => None,
+    }
 }
 
 // Simple date tuple: (year, month, day)
@@ -274,47 +481,15 @@ fn try_to_unix(expr: &str, _original: &str) -> Option<Result<String, String>> {
 }
 
 fn parse_date_to_unix(s: &str) -> Result<String, String> {
-    // Try formats: DD/MM/YYYY, MM/DD/YYYY, YYYY-MM-DD
-    let parts: Vec<&str> = if s.contains('-') {
-        s.split('-').collect()
-    } else if s.contains('/') {
-        s.split('/').collect()
-    } else {
-        return Err("Formato esperado: DD/MM/YYYY ou YYYY-MM-DD".to_string());
-    };
-    
-    if parts.len() != 3 {
-        return Err("Formato esperado: DD/MM/YYYY ou YYYY-MM-DD".to_string());
-    }
-    
-    let (year, month, day) = if parts[0].len() == 4 {
-        // YYYY-MM-DD
-        let y: i32 = parts[0].parse().map_err(|_| "Ano inválido")?;
-        let m: u32 = parts[1].parse().map_err(|_| "Mês inválido")?;
-        let d: u32 = parts[2].parse().map_err(|_| "Dia inválido")?;
-        (y, m, d)
-    } else if parts[2].len() == 4 {
-        // DD/MM/YYYY (assume PT-BR) or MM/DD/YYYY
-        let first: u32 = parts[0].parse().map_err(|_| "Inválido")?;
-        let second: u32 = parts[1].parse().map_err(|_| "Inválido")?;
-        let y: i32 = parts[2].parse().map_err(|_| "Ano inválido")?;
-        
-        if first > 12 {
-            // Must be DD/MM/YYYY
-            (y, second, first)
-        } else if second > 12 {
-            // Must be MM/DD/YYYY
-            (y, first, second)
-        } else {
-            // Ambiguous, assume DD/MM/YYYY (more common internationally)
-            (y, second, first)
+    // Use flexible parser that handles date + optional time
+    if let Some((year, month, day, time)) = parse_date_flexible(s) {
+        let unix_days = date_to_unix_days(year, month, day);
+        let mut timestamp = unix_days * 86400;
+        if let Some((h, m, sec)) = time {
+            timestamp += (h as i64) * 3600 + (m as i64) * 60 + (sec as i64);
         }
+        Ok(timestamp.to_string())
     } else {
-        return Err("Formato esperado: DD/MM/YYYY ou YYYY-MM-DD".to_string());
-    };
-    
-    let unix_days = date_to_unix_days(year, month, day);
-    let timestamp = unix_days * 86400;
-    
-    Ok(timestamp.to_string())
+        Err("Formato esperado: DD/MM/YYYY [HH:MM[:SS]] ou YYYY-MM-DD[THH:MM[:SS]]".to_string())
+    }
 }

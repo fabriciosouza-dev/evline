@@ -52,6 +52,59 @@
   let autocompleteTop = $state(0);
   let autocompleteLeft = $state(0);
 
+  // Undo/Redo stack
+  let undoStack: { text: string; cursor: number }[] = [];
+  let redoStack: { text: string; cursor: number }[] = [];
+  let undoTimer: any;
+  let lastSavedText = "";
+
+  function pushUndo() {
+    if (text !== lastSavedText) {
+      undoStack.push({ text: lastSavedText, cursor: textareaEl?.selectionStart || 0 });
+      if (undoStack.length > 100) undoStack.shift();
+      redoStack = [];
+      lastSavedText = text;
+    }
+  }
+
+  function scheduleUndoSnapshot() {
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(pushUndo, 300);
+  }
+
+  function undo() {
+    pushUndo(); // save current state first
+    const entry = undoStack.pop();
+    if (entry) {
+      redoStack.push({ text, cursor: textareaEl.selectionStart });
+      text = entry.text;
+      textareaEl.value = text;
+      textareaEl.setSelectionRange(entry.cursor, entry.cursor);
+      lineCount = text.split("\n").length;
+      updateHighlight();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(evaluateText, 50);
+      onTextChange?.(tabId, text);
+      lastSavedText = text;
+    }
+  }
+
+  function redo() {
+    const entry = redoStack.pop();
+    if (entry) {
+      undoStack.push({ text, cursor: textareaEl.selectionStart });
+      text = entry.text;
+      textareaEl.value = text;
+      textareaEl.setSelectionRange(entry.cursor, entry.cursor);
+      lineCount = text.split("\n").length;
+      updateHighlight();
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(evaluateText, 50);
+      onTextChange?.(tabId, text);
+      lastSavedText = text;
+    }
+  }
+
   const SUGGESTIONS = [
     "USD", "EUR", "BRL", "GBP", "JPY", "CNY", "CAD", "AUD", "CHF",
     "ARS", "CLP", "COP", "MXN",
@@ -100,12 +153,25 @@
     lineCount = text.split("\n").length;
     updateHighlight();
     updateAutocomplete();
+    scheduleUndoSnapshot();
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(evaluateText, 50);
     onTextChange?.(tabId, text);
   }
 
   function onKeydown(e: KeyboardEvent) {
+    // Undo/Redo
+    if (e.ctrlKey && !e.shiftKey && e.key === "z") {
+      e.preventDefault();
+      undo();
+      return;
+    }
+    if ((e.ctrlKey && e.key === "y") || (e.ctrlKey && e.shiftKey && e.key === "Z")) {
+      e.preventDefault();
+      redo();
+      return;
+    }
+
     if (showAutocomplete) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -275,7 +341,9 @@
   }
 
   function onScroll() {
-    if (highlightEl) {
+    // Textarea overflow is hidden — scroll is on parent .editor
+    // Only sync highlight layer with textarea (if textarea somehow scrolls)
+    if (highlightEl && textareaEl) {
       highlightEl.scrollTop = textareaEl.scrollTop;
       highlightEl.scrollLeft = textareaEl.scrollLeft;
     }
@@ -293,8 +361,11 @@
     return totalFormatted;
   }
 
-  onMount(() => {
+  onMount(async () => {
     text = initialText;
+    lastSavedText = text;
+    // Wait for DOM to be ready
+    await new Promise(r => setTimeout(r, 0));
     if (textareaEl) {
       textareaEl.value = text;
     }
@@ -309,63 +380,83 @@
 </script>
 
 <div class="editor">
-  <div class="gutter">
-    {#each Array(Math.max(lineCount, 1)) as _, i}
-      <div class="line-number">{i + 1}</div>
-    {/each}
-  </div>
-  <div class="input-pane">
-    <div class="highlight-layer" bind:this={highlightEl}></div>
-    <textarea
-      bind:this={textareaEl}
-      oninput={onInput}
-      onkeydown={onKeydown}
-      onscroll={onScroll}
-      placeholder=""
-      spellcheck="false"
-      autocomplete="off"
-    ></textarea>
-    {#if showAutocomplete}
-      <div class="autocomplete" style="top: {autocompleteTop}px; left: {autocompleteLeft}px;">
-        {#each autocompleteItems as item, i}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            class="autocomplete-item"
-            class:active={i === autocompleteIndex}
-            onmousedown={(e) => { e.preventDefault(); applyAutocomplete(item); }}
-          >
-            {item}
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </div>
-  <div class="results-pane">
-    {#each results as result, i}
-      <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
-      <div
-        class="result-line {getResultClass(result.result_type)}"
-        class:copied={copiedIndex === i}
-        class:clickable={!!result.output && result.result_type !== "Comment" && result.result_type !== "Empty"}
-        style="height: 28px"
-        onclick={() => copyResult(result.output, i)}
-        title={result.output ? strings.copyTooltip : ""}
-        role="button"
-        tabindex="-1"
-      >
-        {copiedIndex === i ? strings.copied : result.output}
-      </div>
-    {/each}
+  <div class="editor-scroll">
+    <div class="gutter">
+      {#each Array(Math.max(lineCount, 1)) as _, i}
+        <div class="line-number">{i + 1}</div>
+      {/each}
+    </div>
+    <div class="input-pane">
+      <div class="highlight-layer" bind:this={highlightEl}></div>
+      <textarea
+        bind:this={textareaEl}
+        oninput={onInput}
+        onkeydown={onKeydown}
+        onscroll={onScroll}
+        placeholder=""
+        spellcheck="false"
+        autocomplete="off"
+      ></textarea>
+      {#if showAutocomplete}
+        <div class="autocomplete" style="top: {autocompleteTop}px; left: {autocompleteLeft}px;">
+          {#each autocompleteItems as item, i}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="autocomplete-item"
+              class:active={i === autocompleteIndex}
+              onmousedown={(e) => { e.preventDefault(); applyAutocomplete(item); }}
+            >
+              {item}
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+    <div class="results-pane">
+      {#each results as result, i}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
+        <div
+          class="result-line {getResultClass(result.result_type)}"
+          class:copied={copiedIndex === i}
+          class:clickable={!!result.output && result.result_type !== "Comment" && result.result_type !== "Empty"}
+          style="height: 28px"
+          onclick={() => copyResult(result.output, i)}
+          title={result.output ? strings.copyTooltip : ""}
+          role="button"
+          tabindex="-1"
+        >
+          {copiedIndex === i ? strings.copied : result.output}
+        </div>
+      {/each}
+    </div>
   </div>
 </div>
 
 <style>
   .editor {
-    display: flex;
     flex: 1;
-    overflow: hidden;
+    overflow-y: auto;
+    overflow-x: hidden;
     background: var(--bg-base);
     min-height: 0;
+  }
+
+  .editor::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .editor::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .editor::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 3px;
+  }
+
+  .editor-scroll {
+    display: flex;
+    min-height: 100%;
   }
 
   .gutter {
@@ -375,8 +466,9 @@
     padding-right: 12px;
     border-right: 1px solid var(--border);
     background: var(--bg-deep);
-    overflow: hidden;
     user-select: none;
+    position: sticky;
+    left: 0;
   }
 
   .line-number {
@@ -389,8 +481,7 @@
   .input-pane {
     flex: 1;
     position: relative;
-    overflow: hidden;
-    min-height: 0;
+    min-width: 0;
   }
 
   .highlight-layer {
@@ -408,6 +499,7 @@
     overflow: hidden;
     pointer-events: none;
     color: transparent;
+    z-index: 0;
   }
 
   .highlight-layer :global(.hl-comment) { color: var(--text-muted); font-style: italic; }
@@ -420,11 +512,9 @@
   .highlight-layer :global(.hl-percent) { color: var(--green); }
 
   textarea {
-    position: absolute;
-    top: 0;
-    left: 0;
+    position: relative;
     width: 100%;
-    height: 100%;
+    min-height: 100%;
     background: transparent;
     border: none;
     outline: none;
@@ -435,7 +525,7 @@
     line-height: 28px;
     padding: 16px 20px;
     resize: none;
-    overflow-y: auto;
+    overflow: hidden;
     white-space: pre-wrap;
     word-wrap: break-word;
     tab-size: 2;
@@ -474,7 +564,6 @@
     width: 200px;
     min-width: 150px;
     padding: 16px 20px;
-    overflow-y: auto;
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;

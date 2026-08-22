@@ -8,7 +8,7 @@
 
 Evline é uma calculadora estilo bloco de notas para Linux. Digite expressões naturalmente — uma por linha — e veja os resultados instantaneamente. Sem botões, sem sinal de igual, sem trocar de janela. A resposta está sempre ali.
 
-![Dark Theme](./assets/screenshot-dark.png)
+![Evline Editor](./assets/screenshot-editor.png)
 
 ## Por que Evline?
 
@@ -33,7 +33,7 @@ anterior em BRL                      → R$ 11.330,00
 
 ## Funcionalidades
 
-![Light Theme](./assets/screenshot-light.png)
+![Evline Guia Rápido](./assets/screenshot-guide.png)
 
 - **Matemática em linguagem natural** — `200 + 10%`, `R$50 - 5% desconto`, `8 vezes 9`
 - **Motor bilíngue** — entende português e inglês simultaneamente
@@ -41,11 +41,13 @@ anterior em BRL                      → R$ 11.330,00
 - **Conversão de unidades** — `10 km em milhas`, `100 celsius in fahrenheit`
 - **Variáveis** — `preco = 100` e depois `preco + 15%`
 - **Totais** — `soma`, `média`, `anterior`
-- **Aritmética de datas** — `hoje + 3 meses`, `today + 17 days`
+- **Aritmética de datas** — `hoje + 3 meses`, `today + 17 days`, `agora` mostra data e hora
+- **Conversão de formato de data** — `08/21/2026 to BR`, `21/08/2026 to ISO`
 - **Múltiplas abas** — arraste para reordenar, Ctrl+T para criar, duplo-clique para renomear
 - **Estado persistente** — tudo sobrevive entre sessões
 - **Tema escuro/claro** — Catppuccin Mocha e Latte
 - **Syntax highlighting + autocomplete**
+- **Desfazer/Refazer** — Ctrl+Z / Ctrl+Y com histórico completo
 - **Clique em qualquer resultado para copiar**
 - **Exportar** — Ctrl+S salva como `.txt`
 
@@ -59,6 +61,8 @@ anterior em BRL                      → R$ 11.330,00
 | Ctrl+Tab / Ctrl+Shift+Tab | Navegar abas |
 | Ctrl+1..9 | Ir para aba N |
 | Ctrl+S | Exportar como .txt |
+| Ctrl+Z | Desfazer |
+| Ctrl+Y | Refazer |
 
 ## Instalar
 

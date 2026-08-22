@@ -8,7 +8,7 @@
 
 Evline is a notepad-style calculator for Linux. Type expressions naturally — one per line — and see results instantly. No buttons, no equals sign, no context switching. The answer is always right there.
 
-![Dark Theme](./assets/screenshot-dark.png)
+![Evline Editor](./assets/screenshot-editor.png)
 
 ## Why Evline?
 
@@ -33,7 +33,7 @@ prev in BRL                          → R$ 11,330.00
 
 ## Features
 
-![Light Theme](./assets/screenshot-light.png)
+![Evline Quick Guide](./assets/screenshot-guide.png)
 
 - **Natural language math** — `200 + 10%`, `$50 - 5% discount`, `8 times 9`
 - **Bilingual engine** — understands English and Portuguese simultaneously
@@ -41,11 +41,13 @@ prev in BRL                          → R$ 11,330.00
 - **Unit conversion** — `10 km in miles`, `100 celsius in fahrenheit`
 - **Variables** — `price = 100` then `price + 15%`
 - **Totals** — `sum`, `average`, `prev`
-- **Date arithmetic** — `today + 3 months`, `hoje + 17 dias`
+- **Date arithmetic** — `today + 3 months`, `hoje + 17 dias`, `now` shows full datetime
+- **Date format conversion** — `08/21/2026 to BR`, `21/08/2026 to ISO`
 - **Multiple tabs** — drag to reorder, Ctrl+T to create, double-click to rename
 - **Persistent state** — everything survives between sessions
 - **Dark/Light theme** — Catppuccin Mocha and Latte
 - **Syntax highlighting + autocomplete**
+- **Undo/Redo** — Ctrl+Z / Ctrl+Y with full history
 - **Click any result to copy**
 - **Export** — Ctrl+S saves as `.txt`
 
@@ -59,6 +61,8 @@ prev in BRL                          → R$ 11,330.00
 | Ctrl+Tab / Ctrl+Shift+Tab | Navigate tabs |
 | Ctrl+1..9 | Jump to tab N |
 | Ctrl+S | Export as .txt |
+| Ctrl+Z | Undo |
+| Ctrl+Y | Redo |
 
 ## Install
 

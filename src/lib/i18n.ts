@@ -50,11 +50,15 @@ const ptBr: UiStrings = {
     },
     {
       title: "Datas",
-      examples: ["hoje + 17 dias", "today + 3 months"],
+      examples: ["hoje + 17 dias", "today + 3 months", "hoje + 5 horas", "now / agora → data e hora atual"],
+    },
+    {
+      title: "Formato de Data",
+      examples: ["08/21/2026 to BR → 21/08/2026", "21/08/2026 to US → 08/21/2026", "21/08/2026 14:30 to ISO → 2026-08-21T14:30:00"],
     },
     {
       title: "Porcentagem",
-      examples: ["200 + 10%", "20% of $10", "5% on $30 (adicionar)", "10% off 100 (subtrair)", "$50 - 5% discount"],
+      examples: ["200 + 10%", "20% of $10", "5% on $30 (adicionar)", "10% off 100 (subtrair)", "$50 - 5% desconto", "prev + 15% emergência"],
     },
     {
       title: "Totais",
@@ -70,7 +74,11 @@ const ptBr: UiStrings = {
     },
     {
       title: "Epoch / Timestamp",
-      examples: ["now / agora → timestamp atual", "fromunix(1446587186)", "tounix(21/08/2026)", "deunix(1446587186000)"],
+      examples: ["epoch / timestamp → unix atual", "fromunix(1446587186)", "tounix(21/08/2026 14:30)", "deunix(1446587186000)"],
+    },
+    {
+      title: "Atalhos",
+      examples: ["Ctrl+Z / Ctrl+Y — desfazer / refazer", "Ctrl+T — nova aba", "Ctrl+W — fechar aba", "Ctrl+Shift+T — reabrir aba", "Ctrl+S — exportar como .txt", "Ctrl+Tab — próxima aba"],
     },
   ],
   copyTooltip: "Clique para copiar",
@@ -115,11 +123,15 @@ const en: UiStrings = {
     },
     {
       title: "Dates",
-      examples: ["today + 17 days", "today + 3 months"],
+      examples: ["today + 17 days", "today + 3 months", "today + 5 hours", "now → current date & time"],
+    },
+    {
+      title: "Date Format",
+      examples: ["08/21/2026 to BR → 21/08/2026", "21/08/2026 to US → 08/21/2026", "2026-08-21T10:00 to BR → 21/08/2026 10:00:00"],
     },
     {
       title: "Percentages",
-      examples: ["200 + 10%", "20% of $10", "5% on $30 (add)", "10% off 100 (subtract)", "$50 - 5% discount"],
+      examples: ["200 + 10%", "20% of $10", "5% on $30 (add)", "10% off 100 (subtract)", "$50 - 5% discount", "prev + 15% emergency"],
     },
     {
       title: "Totals",
@@ -135,7 +147,11 @@ const en: UiStrings = {
     },
     {
       title: "Epoch / Timestamp",
-      examples: ["now → current timestamp", "fromunix(1446587186)", "tounix(08/21/2026)", "fromunix(1446587186000)"],
+      examples: ["epoch / timestamp → raw unix", "fromunix(1446587186)", "tounix(08/21/2026 14:30)", "fromunix(1446587186000)"],
+    },
+    {
+      title: "Shortcuts",
+      examples: ["Ctrl+Z / Ctrl+Y — undo / redo", "Ctrl+T — new tab", "Ctrl+W — close tab", "Ctrl+Shift+T — reopen tab", "Ctrl+S — export as .txt", "Ctrl+Tab — next tab"],
     },
   ],
   copyTooltip: "Click to copy",
