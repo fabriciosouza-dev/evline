@@ -1,28 +1,53 @@
 # Evline
 
-> A notepad-style calculator for Linux — evaluate every line.
+### Stop wasting AI credits on simple math. Just type.
 
 **[Leia em Português](./README.pt-br.md)**
 
-![Evline Screenshot](https://img.shields.io/badge/platform-Linux-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+---
 
-Evline is a desktop calculator that works like a text editor. Type expressions naturally — one per line — and see results instantly on the right side. No buttons, no equals sign. Just type and think.
+Evline is a notepad-style calculator for Linux. Type expressions naturally — one per line — and see results instantly. No buttons, no equals sign, no context switching. The answer is always right there.
 
-## What makes it powerful
+![Dark Theme](./assets/screenshot-dark.png)
 
-- **Natural language math** — write `200 + 10%`, `$50 - 5% discount`, `8 times 9`
-- **Bilingual engine** — understands both English and Portuguese simultaneously (`hoje + 17 dias`, `today + 3 months`)
-- **Live currency conversion** — `$100 in EUR`, `50 pounds em reais` (rates updated on launch)
-- **Unit conversion** — `10 km in miles`, `100 celsius in fahrenheit`, `20 ml in tea spoons`
-- **Variables** — `price = 100` then use `price + 15%` on the next line
-- **Totals and aggregation** — `sum`, `average`, reference previous line with `prev`
+## Why Evline?
+
+You don't need ChatGPT to split a bill. You don't need a spreadsheet to budget your month. You don't need to open a browser to convert currencies.
+
+Evline replaces the mental gymnastics of "let me just quickly calculate..." with a scratchpad that **thinks as you type**.
+
+```
+rent = 1200
+groceries = 450
+transport = 180
+sum                                  → 1,830
+prev in USD                          → 328.00
+
+trip budget:
+flights = $1200
+hotel = 5 * $89
+food = 7 * $45
+sum                                  → 2,060
+prev in BRL                          → R$ 11,330.00
+```
+
+## Features
+
+![Light Theme](./assets/screenshot-light.png)
+
+- **Natural language math** — `200 + 10%`, `$50 - 5% discount`, `8 times 9`
+- **Bilingual engine** — understands English and Portuguese simultaneously
+- **Live currency conversion** — `$100 in EUR`, `50 pounds em reais`
+- **Unit conversion** — `10 km in miles`, `100 celsius in fahrenheit`
+- **Variables** — `price = 100` then `price + 15%`
+- **Totals** — `sum`, `average`, `prev`
 - **Date arithmetic** — `today + 3 months`, `hoje + 17 dias`
-- **Multiple tabs** — independent calculation contexts, drag to reorder, rename with double-click
-- **Persistent state** — tabs, content, and settings survive between sessions (`~/.evline/`)
+- **Multiple tabs** — drag to reorder, Ctrl+T to create, double-click to rename
+- **Persistent state** — everything survives between sessions
 - **Dark/Light theme** — Catppuccin Mocha and Latte
-- **Syntax highlighting and autocomplete** — as you type
-- **Click to copy** — click any result or the total to copy to clipboard
-- **Export** — Ctrl+S saves the current tab as a `.txt` file
+- **Syntax highlighting + autocomplete**
+- **Click any result to copy**
+- **Export** — Ctrl+S saves as `.txt`
 
 ## Keyboard shortcuts
 
@@ -31,69 +56,54 @@ Evline is a desktop calculator that works like a text editor. Type expressions n
 | Ctrl+T | New tab |
 | Ctrl+W | Close tab |
 | Ctrl+Shift+T | Reopen closed tab |
-| Ctrl+Tab | Next tab |
-| Ctrl+Shift+Tab | Previous tab |
+| Ctrl+Tab / Ctrl+Shift+Tab | Navigate tabs |
 | Ctrl+1..9 | Jump to tab N |
-| Ctrl+S | Export tab as .txt |
+| Ctrl+S | Export as .txt |
 
-## Installation
+## Install
 
-### From .deb package (Debian/Ubuntu)
+### Download (Debian/Ubuntu)
+
+Grab the `.deb` from [Releases](https://github.com/fabriciosouza-dev/evline/releases):
 
 ```bash
-# Download the latest release from GitHub Releases, then:
 sudo dpkg -i Evline_0.1.0_amd64.deb
 ```
 
 ### Build from source
 
-**Prerequisites:**
-- [Rust](https://rustup.rs/) (stable)
-- [Node.js](https://nodejs.org/) (18+)
-- System dependencies for Tauri on Linux:
-
 ```bash
-# Debian/Ubuntu
+# Prerequisites (Debian/Ubuntu)
 sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
   libssl-dev libayatana-appindicator3-dev librsvg2-dev
-```
 
-**Build:**
-
-```bash
+# Build
 git clone https://github.com/fabriciosouza-dev/evline.git
 cd evline
 npm install
 npm run tauri build
+
+# .deb output at src-tauri/target/release/bundle/deb/
 ```
 
-The `.deb` will be at `src-tauri/target/release/bundle/deb/`.
-
-**Run in development:**
+**Development:**
 
 ```bash
 npm run tauri dev
 ```
 
-## How it works
-
-Each line is independently evaluated. The engine parses natural language expressions, handles operator precedence, resolves variables, converts currencies and units, and formats results according to context.
-
-```
-rent = 1200
-groceries = 450
-transport = 180
-rent + groceries + transport        → 1,830
-sum                                  → 1,830
-prev in EUR                          → 1,647.00 (live rate)
-```
-
 ## Tech stack
 
-- **Frontend:** Svelte 5, Vite
-- **Backend:** Rust (Tauri 2)
-- **Themes:** Catppuccin Mocha / Latte
-- **Persistence:** JSON at `~/.evline/state.json`
+| Layer | Tech |
+|-------|------|
+| Frontend | Svelte 5, Vite |
+| Backend | Rust, Tauri 2 |
+| Themes | Catppuccin Mocha / Latte |
+| Persistence | `~/.evline/state.json` |
+
+## Contributing
+
+PRs welcome. Run `npm run tauri dev` to get started.
 
 ## License
 

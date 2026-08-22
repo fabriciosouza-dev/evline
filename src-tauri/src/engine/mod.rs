@@ -405,7 +405,7 @@ impl Engine {
                     Some(v) => v,
                     None => return Some(Err("No previous value".to_string())),
                 };
-                let new_expr = format!("{}{}", prev_val, rest);
+                let new_expr = format!("{} {}", prev_val, rest);
                 return Some(self.eval_expr(&new_expr));
             }
         }
@@ -423,7 +423,7 @@ impl Engine {
                     return None;
                 }
                 let sum_val = self.get_sum();
-                let new_expr = format!("{}{}", sum_val, rest);
+                let new_expr = format!("{} {}", sum_val, rest);
                 return Some(self.eval_expr(&new_expr));
             }
         }
@@ -639,9 +639,25 @@ impl Engine {
         for op in [" + ", " - ", " * "] {
             if let Some(pos) = expr_trimmed.rfind(op) {
                 let right = expr_trimmed[pos + op.len()..].trim();
-                if right.ends_with('%') {
+
+                // Check for percentage: either "15%" or "15% something" (trailing word)
+                let pct_part = if right.ends_with('%') {
+                    Some(&right[..right.len() - 1])
+                } else if let Some(pct_pos) = right.find('%') {
+                    // "15% emergency" → extract "15" and ignore trailing word
+                    let after_pct = right[pct_pos + 1..].trim();
+                    // Only treat as trailing label if the rest is purely alphabetic words
+                    if after_pct.is_empty() || after_pct.chars().all(|c| c.is_alphabetic() || c.is_whitespace()) {
+                        Some(right[..pct_pos].trim())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                if let Some(pct_str) = pct_part {
                     let left_expr = expr_trimmed[..pos].trim();
-                    let pct_str = &right[..right.len() - 1];
 
                     let left_val = match self.eval_expr(left_expr) {
                         Ok((v, _)) => v,

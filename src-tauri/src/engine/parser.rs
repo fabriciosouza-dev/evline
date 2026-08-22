@@ -152,6 +152,32 @@ pub fn tokenize(expr: &str, variables: &HashMap<String, f64>) -> Result<Vec<Toke
             continue;
         }
 
+        // R$ prefix (two characters) — must be checked before identifiers
+        if c == 'R' && i + 1 < chars.len() && chars[i + 1] == '$' {
+            i += 2;
+            while i < chars.len() && chars[i].is_whitespace() {
+                i += 1;
+            }
+            let start = i;
+            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == '_' || chars[i] == ',') {
+                if chars[i] == ',' {
+                    if i + 1 < chars.len() && chars[i + 1].is_ascii_digit() {
+                        i += 1;
+                    } else {
+                        break;
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+            if i > start {
+                let num_str: String = chars[start..i].iter().filter(|ch| **ch != '_' && **ch != ',').collect();
+                let val: f64 = num_str.parse().map_err(|_| format!("Invalid number: {}", num_str))?;
+                tokens.push(Token::Number(val));
+            }
+            continue;
+        }
+
         // Identifiers (variables, functions, or word operators)
         if c.is_alphabetic() || c == '_' {
             let start = i;
@@ -193,6 +219,32 @@ pub fn tokenize(expr: &str, variables: &HashMap<String, f64>) -> Result<Vec<Toke
                         return Err(format!("Unknown variable: {}", ident));
                     }
                 }
+            }
+            continue;
+        }
+
+        // Currency symbols ($, €, £, ¥) — treat as prefix for a number
+        if c == '$' || c == '€' || c == '£' || c == '¥' {
+            i += 1;
+            while i < chars.len() && chars[i].is_whitespace() {
+                i += 1;
+            }
+            let start = i;
+            while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == '.' || chars[i] == '_' || chars[i] == ',') {
+                if chars[i] == ',' {
+                    if i + 1 < chars.len() && chars[i + 1].is_ascii_digit() {
+                        i += 1;
+                    } else {
+                        break;
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+            if i > start {
+                let num_str: String = chars[start..i].iter().filter(|ch| **ch != '_' && **ch != ',').collect();
+                let val: f64 = num_str.parse().map_err(|_| format!("Invalid number: {}", num_str))?;
+                tokens.push(Token::Number(val));
             }
             continue;
         }
