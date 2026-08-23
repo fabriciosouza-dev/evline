@@ -125,6 +125,17 @@ impl Engine {
             };
         }
 
+        // Easter eggs
+        if let Some((egg, egg_val)) = self.try_easter_egg(trimmed) {
+            return LineResult {
+                line: line_num,
+                input: input.to_string(),
+                output: egg,
+                result_type: ResultType::Date,
+                numeric_value: egg_val,
+            };
+        }
+
         // Strip label (text before ':')
         let expr = self.strip_label(trimmed);
 
@@ -213,6 +224,36 @@ impl Engine {
                 result_type: ResultType::Error,
                 numeric_value: None,
             },
+        }
+    }
+
+    // === Easter eggs ===
+
+    fn try_easter_egg(&self, expr: &str) -> Option<(String, Option<f64>)> {
+        let lower = expr.to_lowercase();
+        let pt = self.locale == Locale::PtBr;
+        match lower.as_str() {
+            "hello" | "olá" | "ola" => Some(("Hello, World! 👋".to_string(), None)),
+            "404" => Some((if pt { "Não Encontrado 🚫" } else { "Not Found 🚫" }.to_string(), Some(404.0))),
+            "evline" => Some(("❤️ v0.2.0".to_string(), None)),
+            "credits" | "créditos" | "creditos" => Some((if pt { "Feito com ☕ por Fabricio" } else { "Made with ☕ by Fabricio" }.to_string(), None)),
+            // Star Wars
+            "may the force be with you" | "que a força esteja com você" | "que a forca esteja com voce" => {
+                Some((if pt { "⭐ Sempre." } else { "⭐ Always." }.to_string(), None))
+            }
+            "i am your father" | "eu sou seu pai" => Some(("Nooooo! 😱".to_string(), None)),
+            // Matrix
+            "matrix" => Some((if pt { "Acorde, Neo... 💊" } else { "Wake up, Neo... 💊" }.to_string(), None)),
+            // Lord of the Rings
+            "one ring" | "um anel" => Some((if pt { "Um Anel para todos governar 💍" } else { "One Ring to rule them all 💍" }.to_string(), Some(1.0))),
+            "you shall not pass" | "você não pode passar" | "voce nao pode passar" => {
+                Some(("🧙 — Gandalf".to_string(), None))
+            }
+            "my precious" | "meu precioso" => Some(("Gollum! Gollum! 💍".to_string(), None)),
+            // Avatar: The Last Airbender
+            "yip yip" => Some((if pt { "🦬 Appa levanta voo!" } else { "🦬 Appa takes flight!" }.to_string(), None)),
+            "toph" => Some((if pt { "Melhor dobradora de terra do mundo! 🪨" } else { "Greatest earthbender in the world! 🪨" }.to_string(), None)),
+            _ => None,
         }
     }
 

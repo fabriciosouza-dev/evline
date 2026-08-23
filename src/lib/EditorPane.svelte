@@ -305,15 +305,55 @@
     return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
+  let showMatrix = $state(false);
+  let toastMessage = $state("");
+  let showToast = $state(false);
+  let lastToastOutput = "";
+
   async function evaluateText() {
     try {
       const response = await invoke<EvalResponse>("evaluate", { tabId, text, uiLocale });
       results = response.results;
       totalFormatted = response.total_formatted;
       onTotalChange?.(tabId, totalFormatted);
+
+      // Easter eggs: check for any result that looks like an egg
+      for (const r of results) {
+        if (r.result_type === "Date" && r.output && isEasterEgg(r.output)) {
+          if (r.output !== lastToastOutput) {
+            lastToastOutput = r.output;
+            if (r.output.includes("Neo") || r.output.includes("Acorde")) {
+              triggerMatrix();
+            }
+            triggerToast(r.output);
+          }
+          break;
+        }
+      }
+
+      // Reset if no egg found
+      const hasEgg = results.some(r => r.result_type === "Date" && r.output && isEasterEgg(r.output));
+      if (!hasEgg) {
+        lastToastOutput = "";
+      }
     } catch (err) {
       console.error("Evaluation error:", err);
     }
+  }
+
+  function isEasterEgg(output: string): boolean {
+    return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2700}-\u{27BF}❤️⭐]/u.test(output);
+  }
+
+  function triggerMatrix() {
+    showMatrix = true;
+    setTimeout(() => { showMatrix = false; }, 4000);
+  }
+
+  function triggerToast(message: string) {
+    toastMessage = message;
+    showToast = true;
+    setTimeout(() => { showToast = false; }, 3000);
   }
 
   function copyResult(output: string, index: number) {
@@ -380,6 +420,20 @@
 </script>
 
 <div class="editor">
+  {#if showMatrix}
+    <div class="matrix-overlay">
+      {#each Array(20) as _, i}
+        <span class="matrix-col" style="left: {i * 5}%; animation-delay: {Math.random() * 2}s; animation-duration: {1.5 + Math.random() * 2}s;">
+          {Array(30).fill(0).map(() => String.fromCharCode(0x30A0 + Math.random() * 96)).join('')}
+        </span>
+      {/each}
+    </div>
+  {/if}
+  {#if showToast}
+    <div class="toast-overlay">
+      <div class="toast">{toastMessage}</div>
+    </div>
+  {/if}
   <div class="editor-scroll">
     <div class="gutter">
       {#each Array(Math.max(lineCount, 1)) as _, i}
@@ -425,7 +479,7 @@
           role="button"
           tabindex="-1"
         >
-          {copiedIndex === i ? strings.copied : result.output}
+          {copiedIndex === i ? strings.copied : (isEasterEgg(result.output) ? "" : result.output)}
         </div>
       {/each}
     </div>
@@ -439,6 +493,7 @@
     overflow-x: hidden;
     background: var(--bg-base);
     min-height: 0;
+    position: relative;
   }
 
   .editor::-webkit-scrollbar {
@@ -593,4 +648,77 @@
   .result-line.date { color: var(--accent); }
   .result-line.error { color: var(--red); font-size: 12px; }
   .result-line.comment, .result-line.empty { color: transparent; }
+
+  /* Matrix easter egg */
+  .matrix-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 50;
+    overflow: hidden;
+    pointer-events: none;
+    animation: matrix-fade 4s ease-out forwards;
+  }
+
+  @keyframes matrix-fade {
+    0% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  .matrix-col {
+    position: absolute;
+    top: -100%;
+    font-size: 14px;
+    line-height: 1.2;
+    color: #00ff41;
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    animation: matrix-fall linear infinite;
+    opacity: 0.7;
+    font-family: monospace;
+    text-shadow: 0 0 8px #00ff41;
+  }
+
+  @keyframes matrix-fall {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(250%); }
+  }
+
+  /* Toast easter egg */
+  .toast-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 60;
+  }
+
+  .toast {
+    background: var(--bg-elevated);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 24px;
+    font-size: 16px;
+    color: var(--text-primary);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    animation: toast-in 3s ease-out forwards;
+    text-align: center;
+    max-width: 80%;
+  }
+
+  @keyframes toast-in {
+    0% { opacity: 0; transform: scale(0.8) translateY(10px); }
+    10% { opacity: 1; transform: scale(1) translateY(0); }
+    80% { opacity: 1; transform: scale(1) translateY(0); }
+    100% { opacity: 0; transform: scale(0.95) translateY(-5px); }
+  }
 </style>
