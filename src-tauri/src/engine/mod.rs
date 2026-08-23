@@ -136,6 +136,28 @@ impl Engine {
             };
         }
 
+        // HTTP status code lookup
+        if let Some(status_str) = self.try_http_status(trimmed) {
+            return LineResult {
+                line: line_num,
+                input: input.to_string(),
+                output: status_str,
+                result_type: ResultType::Number,
+                numeric_value: None,
+            };
+        }
+
+        // Port lookup
+        if let Some(port_str) = self.try_port_lookup(trimmed) {
+            return LineResult {
+                line: line_num,
+                input: input.to_string(),
+                output: port_str,
+                result_type: ResultType::Number,
+                numeric_value: None,
+            };
+        }
+
         // Strip label (text before ':')
         let expr = self.strip_label(trimmed);
 
@@ -227,6 +249,61 @@ impl Engine {
         }
     }
 
+    // === HTTP Status Code lookup ===
+
+    fn try_http_status(&self, expr: &str) -> Option<String> {
+        let lower = expr.to_lowercase();
+        let trimmed = lower.trim();
+
+        // Only: "http XXX" or "status XXX"
+        let code_str = if trimmed.starts_with("http ") {
+            Some(trimmed[5..].trim())
+        } else if trimmed.starts_with("status ") {
+            Some(trimmed[7..].trim())
+        } else {
+            None
+        };
+
+        let code: u16 = code_str?.parse().ok()?;
+        let description = http_status_description(code)?;
+        let icon = match code {
+            200..=299 => "[ok]",
+            300..=399 => "[redirect]",
+            400..=499 => "[client error]",
+            500..=599 => "[server error]",
+            _ => "",
+        };
+
+        Some(format!("{} {} {}", code, description, icon))
+    }
+
+    // === Port lookup ===
+
+    fn try_port_lookup(&self, expr: &str) -> Option<String> {
+        let lower = expr.to_lowercase();
+        let trimmed = lower.trim();
+
+        // "port <service>" or "porta <service>" → returns port number
+        // "port <number>" or "porta <number>" → returns service name
+        let query = if trimmed.starts_with("port ") {
+            Some(trimmed[5..].trim())
+        } else if trimmed.starts_with("porta ") {
+            Some(trimmed[6..].trim())
+        } else {
+            None
+        }?;
+
+        // Try as number first → return service name
+        if let Ok(port_num) = query.parse::<u16>() {
+            let service = port_to_service(port_num)?;
+            return Some(format!("{} ({})", service, port_protocol(port_num)));
+        }
+
+        // Try as service name → return port number
+        let port = service_to_port(query)?;
+        Some(format!("{} ({})", port, port_protocol(port)))
+    }
+
     // === Easter eggs ===
 
     fn try_easter_egg(&self, expr: &str) -> Option<(String, Option<f64>)> {
@@ -234,8 +311,7 @@ impl Engine {
         let pt = self.locale == Locale::PtBr;
         match lower.as_str() {
             "hello" | "olá" | "ola" => Some(("Hello, World! 👋".to_string(), None)),
-            "404" => Some((if pt { "Não Encontrado 🚫" } else { "Not Found 🚫" }.to_string(), Some(404.0))),
-            "evline" => Some(("❤️ v0.2.1".to_string(), None)),
+            "evline" => Some(("❤️ v0.3.0".to_string(), None)),
             "credits" | "créditos" | "creditos" => Some((if pt { "Feito com ☕ por Fabricio" } else { "Made with ☕ by Fabricio" }.to_string(), None)),
             // Star Wars
             "may the force be with you" | "que a força esteja com você" | "que a forca esteja com voce" => {
@@ -934,6 +1010,178 @@ fn is_valid_identifier(s: &str) -> bool {
     !s.is_empty()
         && s.chars().next().map_or(false, |c| c.is_alphabetic() || c == '_')
         && s.chars().all(|c| c.is_alphanumeric() || c == '_')
+}
+
+fn service_to_port(service: &str) -> Option<u16> {
+    match service {
+        "ftp" => Some(21),
+        "ssh" => Some(22),
+        "telnet" => Some(23),
+        "smtp" => Some(25),
+        "dns" => Some(53),
+        "dhcp" => Some(67),
+        "http" => Some(80),
+        "pop3" => Some(110),
+        "imap" => Some(143),
+        "https" => Some(443),
+        "smtps" => Some(465),
+        "imaps" => Some(993),
+        "pop3s" => Some(995),
+        "mysql" | "mariadb" => Some(3306),
+        "rdp" => Some(3389),
+        "postgres" | "postgresql" => Some(5432),
+        "mongodb" | "mongo" => Some(27017),
+        "redis" => Some(6379),
+        "elasticsearch" | "elastic" => Some(9200),
+        "rabbitmq" => Some(5672),
+        "kafka" => Some(9092),
+        "docker" => Some(2375),
+        "grafana" => Some(3000),
+        "jenkins" => Some(8080),
+        "nginx" => Some(80),
+        "apache" => Some(80),
+        "node" | "express" => Some(3000),
+        "react" | "vite" => Some(5173),
+        "next" | "nextjs" => Some(3000),
+        "flask" => Some(5000),
+        "django" => Some(8000),
+        "spring" => Some(8080),
+        "memcached" => Some(11211),
+        "ntp" => Some(123),
+        "ldap" => Some(389),
+        "samba" | "smb" => Some(445),
+        "vnc" => Some(5900),
+        "prometheus" => Some(9090),
+        "consul" => Some(8500),
+        "etcd" => Some(2379),
+        "minio" => Some(9000),
+        "pgadmin" => Some(5050),
+        _ => None,
+    }
+}
+
+fn port_to_service(port: u16) -> Option<&'static str> {
+    match port {
+        21 => Some("FTP"),
+        22 => Some("SSH"),
+        23 => Some("Telnet"),
+        25 => Some("SMTP"),
+        53 => Some("DNS"),
+        67 => Some("DHCP"),
+        80 => Some("HTTP"),
+        110 => Some("POP3"),
+        123 => Some("NTP"),
+        143 => Some("IMAP"),
+        389 => Some("LDAP"),
+        443 => Some("HTTPS"),
+        445 => Some("SMB"),
+        465 => Some("SMTPS"),
+        993 => Some("IMAPS"),
+        995 => Some("POP3S"),
+        2375 => Some("Docker"),
+        2379 => Some("etcd"),
+        3000 => Some("Grafana/Node"),
+        3306 => Some("MySQL"),
+        3389 => Some("RDP"),
+        5000 => Some("Flask"),
+        5050 => Some("pgAdmin"),
+        5173 => Some("Vite"),
+        5432 => Some("PostgreSQL"),
+        5672 => Some("RabbitMQ"),
+        5900 => Some("VNC"),
+        6379 => Some("Redis"),
+        8000 => Some("Django"),
+        8080 => Some("Jenkins/Spring"),
+        8500 => Some("Consul"),
+        9000 => Some("MinIO"),
+        9090 => Some("Prometheus"),
+        9092 => Some("Kafka"),
+        9200 => Some("Elasticsearch"),
+        11211 => Some("Memcached"),
+        27017 => Some("MongoDB"),
+        _ => None,
+    }
+}
+
+fn port_protocol(port: u16) -> &'static str {
+    match port {
+        53 => "TCP/UDP",
+        67 | 68 => "UDP",
+        123 => "UDP",
+        _ => "TCP",
+    }
+}
+
+fn http_status_description(code: u16) -> Option<&'static str> {
+    match code {
+        // 1xx Informational
+        100 => Some("Continue"),
+        101 => Some("Switching Protocols"),
+        102 => Some("Processing"),
+        103 => Some("Early Hints"),
+        // 2xx Success
+        200 => Some("OK"),
+        201 => Some("Created"),
+        202 => Some("Accepted"),
+        203 => Some("Non-Authoritative Information"),
+        204 => Some("No Content"),
+        205 => Some("Reset Content"),
+        206 => Some("Partial Content"),
+        207 => Some("Multi-Status"),
+        208 => Some("Already Reported"),
+        226 => Some("IM Used"),
+        // 3xx Redirection
+        300 => Some("Multiple Choices"),
+        301 => Some("Moved Permanently"),
+        302 => Some("Found"),
+        303 => Some("See Other"),
+        304 => Some("Not Modified"),
+        307 => Some("Temporary Redirect"),
+        308 => Some("Permanent Redirect"),
+        // 4xx Client Error
+        400 => Some("Bad Request"),
+        401 => Some("Unauthorized"),
+        402 => Some("Payment Required"),
+        403 => Some("Forbidden"),
+        404 => Some("Not Found"),
+        405 => Some("Method Not Allowed"),
+        406 => Some("Not Acceptable"),
+        407 => Some("Proxy Authentication Required"),
+        408 => Some("Request Timeout"),
+        409 => Some("Conflict"),
+        410 => Some("Gone"),
+        411 => Some("Length Required"),
+        412 => Some("Precondition Failed"),
+        413 => Some("Payload Too Large"),
+        414 => Some("URI Too Long"),
+        415 => Some("Unsupported Media Type"),
+        416 => Some("Range Not Satisfiable"),
+        417 => Some("Expectation Failed"),
+        418 => Some("I'm a Teapot"),
+        421 => Some("Misdirected Request"),
+        422 => Some("Unprocessable Entity"),
+        423 => Some("Locked"),
+        424 => Some("Failed Dependency"),
+        425 => Some("Too Early"),
+        426 => Some("Upgrade Required"),
+        428 => Some("Precondition Required"),
+        429 => Some("Too Many Requests"),
+        431 => Some("Request Header Fields Too Large"),
+        451 => Some("Unavailable For Legal Reasons"),
+        // 5xx Server Error
+        500 => Some("Internal Server Error"),
+        501 => Some("Not Implemented"),
+        502 => Some("Bad Gateway"),
+        503 => Some("Service Unavailable"),
+        504 => Some("Gateway Timeout"),
+        505 => Some("HTTP Version Not Supported"),
+        506 => Some("Variant Also Negotiates"),
+        507 => Some("Insufficient Storage"),
+        508 => Some("Loop Detected"),
+        510 => Some("Not Extended"),
+        511 => Some("Network Authentication Required"),
+        _ => None,
+    }
 }
 
 fn format_number(val: f64) -> String {

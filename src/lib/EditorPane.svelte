@@ -44,6 +44,31 @@
   let copiedIndex = $state(-1);
   let initialized = false;
 
+  // Resizable pane
+  let resultsPaneWidth = $state(220);
+  let isResizing = false;
+
+  function startResize(e: MouseEvent) {
+    e.preventDefault();
+    isResizing = true;
+    const startX = e.clientX;
+    const startWidth = resultsPaneWidth;
+
+    function onMouseMove(e: MouseEvent) {
+      const delta = startX - e.clientX;
+      resultsPaneWidth = Math.max(100, Math.min(500, startWidth + delta));
+    }
+
+    function onMouseUp() {
+      isResizing = false;
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+  }
+
   // Autocomplete state
   let showAutocomplete = $state(false);
   let autocompleteItems: string[] = $state([]);
@@ -534,7 +559,9 @@
         </div>
       {/if}
     </div>
-    <div class="results-pane" class:gravity={showGravity} class:blink-effect={showBlink}>
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="resize-handle" onmousedown={startResize}></div>
+    <div class="results-pane" class:gravity={showGravity} class:blink-effect={showBlink} style="width: {resultsPaneWidth}px">
       {#each results as result, i}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
         <div
@@ -544,7 +571,7 @@
           class:snapped={snappedLines.has(i)}
           style="height: 28px"
           onclick={() => copyResult(result.output, i)}
-          title={result.output ? strings.copyTooltip : ""}
+          title={result.output || ""}
           role="button"
           tabindex="-1"
         >
@@ -685,12 +712,24 @@
   }
 
   .results-pane {
-    width: 200px;
-    min-width: 150px;
+    min-width: 100px;
     padding: 16px 20px;
     border-left: 1px solid var(--border);
     display: flex;
     flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .resize-handle {
+    width: 4px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+
+  .resize-handle:hover {
+    background: var(--accent);
   }
 
   .result-line {

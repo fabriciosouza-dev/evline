@@ -1,6 +1,6 @@
 [package]
 name = "evline"
-version = "0.2.1"
+version = "0.3.0"
 description = "A notepad-style calculator for Linux — eval every line"
 authors = ["you"]
 edition = "2021"
