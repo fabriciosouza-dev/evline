@@ -71,7 +71,7 @@ prev in BRL                          → R$ 11,330.00
 Grab the `.deb` from [Releases](https://github.com/fabriciosouza-dev/evline/releases):
 
 ```bash
-sudo dpkg -i Evline_0.1.0_amd64.deb
+sudo dpkg -i Evline_0.3.0_amd64.deb
 ```
 
 ### Build from source
