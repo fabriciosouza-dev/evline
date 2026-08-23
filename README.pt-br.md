@@ -29,6 +29,12 @@ hotel = 5 * $89
 alimentação = 7 * $45
 soma                                 → 2,060
 anterior em BRL                      → R$ 11.330,00
+
+// Referência rápida
+http 404                             → 404 Not Found [client error]
+status 201                           → 201 Created [ok]
+porta ssh                            → 22 (TCP)
+porta redis                          → 6379 (TCP)
 ```
 
 ## Funcionalidades
@@ -43,7 +49,10 @@ anterior em BRL                      → R$ 11.330,00
 - **Totais** — `soma`, `média`, `anterior`
 - **Aritmética de datas** — `hoje + 3 meses`, `today + 17 days`, `agora` mostra data e hora
 - **Conversão de formato de data** — `08/21/2026 to BR`, `21/08/2026 to ISO`
+- **Códigos HTTP** — `http 200`, `status 404` → referência instantânea
+- **Lookup de portas** — `port ssh` → 22, `porta 3306` → MySQL (bidirecional)
 - **Múltiplas abas** — arraste para reordenar, Ctrl+T para criar, duplo-clique para renomear
+- **Painel redimensionável** — arraste a borda para expandir os resultados
 - **Estado persistente** — tudo sobrevive entre sessões
 - **Tema escuro/claro** — Catppuccin Mocha e Latte
 - **Syntax highlighting + autocomplete**

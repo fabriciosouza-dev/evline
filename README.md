@@ -29,6 +29,12 @@ hotel = 5 * $89
 food = 7 * $45
 sum                                  → 2,060
 prev in BRL                          → R$ 11,330.00
+
+// Quick reference
+http 404                             → 404 Not Found [client error]
+status 201                           → 201 Created [ok]
+port ssh                             → 22 (TCP)
+porta redis                          → 6379 (TCP)
 ```
 
 ## Features
@@ -43,7 +49,10 @@ prev in BRL                          → R$ 11,330.00
 - **Totals** — `sum`, `average`, `prev`
 - **Date arithmetic** — `today + 3 months`, `hoje + 17 dias`, `now` shows full datetime
 - **Date format conversion** — `08/21/2026 to BR`, `21/08/2026 to ISO`
+- **HTTP status codes** — `http 200`, `status 404` → instant reference
+- **Port lookup** — `port ssh` → 22, `porta 3306` → MySQL (bidirectional)
 - **Multiple tabs** — drag to reorder, Ctrl+T to create, double-click to rename
+- **Resizable results pane** — drag the border to expand
 - **Persistent state** — everything survives between sessions
 - **Dark/Light theme** — Catppuccin Mocha and Latte
 - **Syntax highlighting + autocomplete**
