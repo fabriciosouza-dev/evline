@@ -325,6 +325,21 @@
             if (r.output.includes("Neo") || r.output.includes("Acorde")) {
               triggerMatrix();
             }
+            if (r.output.includes("inevitable") || r.output.includes("inevitável")) {
+              triggerSnap();
+            }
+            if (r.output.includes("Aileron")) {
+              triggerBarrelRoll();
+            }
+            if (r.output.includes("Newton")) {
+              triggerGravity();
+            }
+            if (r.output.includes("tilted")) {
+              triggerTilt();
+            }
+            if (r.output.includes("blink")) {
+              triggerBlink();
+            }
             triggerToast(r.output);
           }
           break;
@@ -350,10 +365,63 @@
     setTimeout(() => { showMatrix = false; }, 4000);
   }
 
+  let snappedLines: Set<number> = $state(new Set());
+
+  function triggerSnap() {
+    // Snap: half the lines disappear
+    const indices: number[] = [];
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].output && results[i].result_type !== "Comment" && results[i].result_type !== "Empty") {
+        indices.push(i);
+      }
+    }
+    // Randomly pick half
+    const shuffled = indices.sort(() => Math.random() - 0.5);
+    const toSnap = shuffled.slice(0, Math.ceil(shuffled.length / 2));
+    snappedLines = new Set(toSnap);
+
+    // Restore after 3s
+    setTimeout(() => {
+      snappedLines = new Set();
+    }, 3000);
+  }
+
   function triggerToast(message: string) {
     toastMessage = message;
     showToast = true;
     setTimeout(() => { showToast = false; }, 3000);
+  }
+
+  function triggerBarrelRoll() {
+    document.documentElement.style.transition = "transform 1.5s ease-in-out";
+    document.documentElement.style.transform = "rotate(360deg)";
+    setTimeout(() => {
+      document.documentElement.style.transition = "";
+      document.documentElement.style.transform = "";
+    }, 1600);
+  }
+
+  let showGravity = $state(false);
+
+  function triggerGravity() {
+    showGravity = true;
+    setTimeout(() => { showGravity = false; }, 3000);
+  }
+
+  function triggerTilt() {
+    document.documentElement.style.transition = "transform 0.5s ease-in-out";
+    document.documentElement.style.transform = "rotate(2deg)";
+    setTimeout(() => {
+      document.documentElement.style.transform = "";
+      setTimeout(() => { document.documentElement.style.transition = ""; }, 500);
+    }, 3000);
+  }
+
+  let showBlink = $state(false);
+
+  function triggerBlink() {
+    showBlink = true;
+    setTimeout(() => { showBlink = false; }, 3000);
   }
 
   function copyResult(output: string, index: number) {
@@ -466,13 +534,14 @@
         </div>
       {/if}
     </div>
-    <div class="results-pane">
+    <div class="results-pane" class:gravity={showGravity} class:blink-effect={showBlink}>
       {#each results as result, i}
         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
         <div
           class="result-line {getResultClass(result.result_type)}"
           class:copied={copiedIndex === i}
           class:clickable={!!result.output && result.result_type !== "Comment" && result.result_type !== "Empty"}
+          class:snapped={snappedLines.has(i)}
           style="height: 28px"
           onclick={() => copyResult(result.output, i)}
           title={result.output ? strings.copyTooltip : ""}
@@ -649,6 +718,16 @@
   .result-line.error { color: var(--red); font-size: 12px; }
   .result-line.comment, .result-line.empty { color: transparent; }
 
+  .result-line.snapped {
+    animation: snap-dust 0.8s ease-out forwards;
+  }
+
+  @keyframes snap-dust {
+    0% { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+    50% { opacity: 0.5; transform: translateX(5px) scale(0.95); filter: blur(1px); }
+    100% { opacity: 0; transform: translateX(20px) scale(0.8); filter: blur(3px); }
+  }
+
   /* Matrix easter egg */
   .matrix-overlay {
     position: absolute;
@@ -720,5 +799,30 @@
     10% { opacity: 1; transform: scale(1) translateY(0); }
     80% { opacity: 1; transform: scale(1) translateY(0); }
     100% { opacity: 0; transform: scale(0.95) translateY(-5px); }
+  }
+
+  /* Gravity easter egg */
+  .results-pane.gravity :global(.result-line) {
+    animation: gravity-fall 1.5s ease-in forwards;
+    animation-delay: calc(var(--line-index, 0) * 0.05s);
+  }
+
+  @keyframes gravity-fall {
+    0% { transform: translateY(0); }
+    60% { transform: translateY(300px); }
+    70% { transform: translateY(280px); }
+    80% { transform: translateY(300px); }
+    90% { transform: translateY(295px); }
+    100% { transform: translateY(300px); opacity: 0.3; }
+  }
+
+  /* Blink easter egg */
+  .results-pane.blink-effect :global(.result-line) {
+    animation: blink-90s 0.5s step-end infinite;
+  }
+
+  @keyframes blink-90s {
+    0% { opacity: 1; }
+    50% { opacity: 0; }
   }
 </style>

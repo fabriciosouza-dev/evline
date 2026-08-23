@@ -235,7 +235,7 @@ impl Engine {
         match lower.as_str() {
             "hello" | "olá" | "ola" => Some(("Hello, World! 👋".to_string(), None)),
             "404" => Some((if pt { "Não Encontrado 🚫" } else { "Not Found 🚫" }.to_string(), Some(404.0))),
-            "evline" => Some(("❤️ v0.2.0".to_string(), None)),
+            "evline" => Some(("❤️ v0.2.1".to_string(), None)),
             "credits" | "créditos" | "creditos" => Some((if pt { "Feito com ☕ por Fabricio" } else { "Made with ☕ by Fabricio" }.to_string(), None)),
             // Star Wars
             "may the force be with you" | "que a força esteja com você" | "que a forca esteja com voce" => {
@@ -253,6 +253,16 @@ impl Engine {
             // Avatar: The Last Airbender
             "yip yip" => Some((if pt { "🦬 Appa levanta voo!" } else { "🦬 Appa takes flight!" }.to_string(), None)),
             "toph" => Some((if pt { "Melhor dobradora de terra do mundo! 🪨" } else { "Greatest earthbender in the world! 🪨" }.to_string(), None)),
+            // Thanos
+            "thanos" => Some((if pt { "Eu sou inevitável... 🫰" } else { "I am inevitable... 🫰" }.to_string(), None)),
+            // Barrel roll
+            "do a barrel roll" => Some(("🛫 Aileron roll!".to_string(), None)),
+            // Gravity
+            "gravity" | "gravidade" => Some((if pt { "🍎 Newton aprova!" } else { "🍎 Newton approves!" }.to_string(), None)),
+            // Tilt
+            "askew" | "tilt" | "torto" => Some(("↗️ ~tilted~".to_string(), None)),
+            // Blink
+            "blink" | "piscar" => Some(("👁️ <blink> is back!".to_string(), None)),
             _ => None,
         }
     }
