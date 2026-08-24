@@ -1,40 +1,31 @@
 use super::i18n::Keywords;
-use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::{Local, TimeZone, Datelike, Timelike, Duration, NaiveDate};
 
 /// Try to evaluate a date arithmetic expression
 /// "today + 17 days" -> "21/08/2026"
 /// "now" -> "21/08/2026 14:30:05"
+/// "agora + 1 hora e 12 minutos" -> "24/08/2026 15:42:05"
+/// "now + 1:30" -> "24/08/2026 16:00:05"
 /// "08/21/2026 to BR" -> "21/08/2026"
 pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<String, String>> {
     let lower = expr.to_lowercase();
     let trimmed = lower.trim();
 
-    // Check for "now"/"agora" -> current date and time
+    // Check for "now"/"agora" with optional arithmetic
     if trimmed == "now" || trimmed == "agora" {
-        let secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        let date = unix_days_to_date(secs / 86400);
-        let time_secs = secs % 86400;
-        let hours = time_secs / 3600;
-        let minutes = (time_secs % 3600) / 60;
-        let seconds = time_secs % 60;
-        let formatted = if is_pt(keywords) {
-            format!("{:02}/{:02}/{} {:02}:{:02}:{:02}", date.2, date.1, date.0, hours, minutes, seconds)
-        } else {
-            format!("{}/{}/{} {:02}:{:02}:{:02}", date.1, date.2, date.0, hours, minutes, seconds)
-        };
-        return Some(Ok(formatted));
+        let now = Local::now();
+        return Some(Ok(format_datetime(&now, keywords)));
+    }
+
+    // Check for "now +/- ..." or "agora +/- ..."
+    if let Some(result) = try_now_arithmetic(trimmed, keywords) {
+        return Some(result);
     }
 
     // Check for "epoch"/"timestamp" -> raw unix timestamp
     if trimmed == "epoch" || trimmed == "timestamp" {
-        let secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        return Some(Ok(secs.to_string()));
+        let now = Local::now();
+        return Some(Ok(now.timestamp().to_string()));
     }
 
     // Check for "fromunix(N)" or "fromepoch(N)" or "deunix(N)" or "deepoch(N)"
@@ -65,7 +56,6 @@ pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<Str
 
     let rest = trimmed[today_kw.len()..].trim();
     if rest.is_empty() {
-        // Just "today" - return current date
         let now = get_today();
         return Some(Ok(format_date(now.0, now.1, now.2, keywords)));
     }
@@ -84,10 +74,16 @@ pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<Str
         return Some(Err(msg.to_string()));
     };
 
+    // Try compound time parse (e.g. "1:30" or "1 hora e 30 minutos")
+    if let Some(total_secs) = parse_compound_duration(after_op, keywords) {
+        let sign: i64 = if op == '+' { 1 } else { -1 };
+        let now = Local::now() + Duration::seconds(sign * total_secs);
+        return Some(Ok(format_datetime(&now, keywords)));
+    }
+
     // Parse number and unit: "17 days"
     let parts: Vec<&str> = after_op.splitn(2, char::is_whitespace).collect();
     if parts.len() < 2 {
-        // Maybe just a number (assume days)
         if let Ok(n) = after_op.parse::<i64>() {
             let today = get_today();
             let result = add_days(today, if op == '+' { n } else { -n });
@@ -125,36 +121,26 @@ pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<Str
     } else if keywords.years.iter().any(|k| unit == *k) {
         add_years(today, number)
     } else if keywords.hours.iter().any(|k| unit == *k) {
-        // hours — return date + time
-        let secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        let new_secs = secs + number * 3600;
-        let date = unix_days_to_date(new_secs / 86400);
-        let time_secs = new_secs % 86400;
-        let h = time_secs / 3600;
-        let m = (time_secs % 3600) / 60;
+        let now = Local::now() + Duration::hours(number);
         if is_pt(keywords) {
-            return Some(Ok(format!("{:02}/{:02}/{} {:02}:{:02}", date.2, date.1, date.0, h, m)));
+            return Some(Ok(format!("{:02}/{:02}/{} {:02}:{:02}",
+                now.day(), now.month(), now.year(), now.hour(), now.minute())));
         } else {
-            return Some(Ok(format!("{}/{}/{} {:02}:{:02}", date.1, date.2, date.0, h, m)));
+            return Some(Ok(format!("{}/{}/{} {:02}:{:02}",
+                now.month(), now.day(), now.year(), now.hour(), now.minute())));
         }
     } else if keywords.minutes.iter().any(|k| unit == *k) {
-        let secs = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        let new_secs = secs + number * 60;
-        let date = unix_days_to_date(new_secs / 86400);
-        let time_secs = new_secs % 86400;
-        let h = time_secs / 3600;
-        let m = (time_secs % 3600) / 60;
+        let now = Local::now() + Duration::minutes(number);
         if is_pt(keywords) {
-            return Some(Ok(format!("{:02}/{:02}/{} {:02}:{:02}", date.2, date.1, date.0, h, m)));
+            return Some(Ok(format!("{:02}/{:02}/{} {:02}:{:02}",
+                now.day(), now.month(), now.year(), now.hour(), now.minute())));
         } else {
-            return Some(Ok(format!("{}/{}/{} {:02}:{:02}", date.1, date.2, date.0, h, m)));
+            return Some(Ok(format!("{}/{}/{} {:02}:{:02}",
+                now.month(), now.day(), now.year(), now.hour(), now.minute())));
         }
+    } else if keywords.seconds.iter().any(|k| unit == *k) {
+        let now = Local::now() + Duration::seconds(number);
+        return Some(Ok(format_datetime(&now, keywords)));
     } else {
         let msg = if is_pt(keywords) {
             format!("Unidade de tempo desconhecida: {}", unit)
@@ -167,12 +153,195 @@ pub fn try_date_arithmetic(expr: &str, keywords: &Keywords) -> Option<Result<Str
     Some(Ok(format_date(result.0, result.1, result.2, keywords)))
 }
 
+/// Handle "now +/- duration" and "agora +/- duration"
+fn try_now_arithmetic(trimmed: &str, keywords: &Keywords) -> Option<Result<String, String>> {
+    let now_keywords = ["now", "agora"];
+
+    for kw in &now_keywords {
+        if !trimmed.starts_with(kw) {
+            continue;
+        }
+        let rest = trimmed[kw.len()..].trim();
+        if rest.is_empty() {
+            continue; // handled elsewhere as bare "now"
+        }
+
+        // Must start with + or -
+        let (op, after_op) = if rest.starts_with('+') {
+            ('+', rest[1..].trim())
+        } else if rest.starts_with('-') {
+            ('-', rest[1..].trim())
+        } else {
+            continue;
+        };
+
+        let sign: i64 = if op == '+' { 1 } else { -1 };
+
+        // Try compound duration: "1:30", "1 hora e 12 minutos", "2 hours and 30 minutes"
+        if let Some(total_secs) = parse_compound_duration(after_op, keywords) {
+            let result = Local::now() + Duration::seconds(sign * total_secs);
+            return Some(Ok(format_datetime(&result, keywords)));
+        }
+
+        // Try single unit: "3 hours", "45 minutes"
+        let parts: Vec<&str> = after_op.splitn(2, char::is_whitespace).collect();
+        if parts.len() >= 2 {
+            if let Ok(n) = parts[0].parse::<i64>() {
+                let unit = parts[1].trim();
+                let secs = unit_to_seconds(unit, keywords);
+                if secs > 0 {
+                    let result = Local::now() + Duration::seconds(sign * n * secs);
+                    return Some(Ok(format_datetime(&result, keywords)));
+                }
+            }
+        }
+
+        // Try bare number (assume minutes)
+        if let Ok(n) = after_op.parse::<i64>() {
+            let result = Local::now() + Duration::minutes(sign * n);
+            return Some(Ok(format_datetime(&result, keywords)));
+        }
+
+        return None;
+    }
+
+    None
+}
+
+/// Parse compound durations:
+/// - "1:12" -> 1h12m = 4320s
+/// - "1:30:15" -> 1h30m15s
+/// - "1 hora e 12 minutos" -> 4320s
+/// - "2 hours and 30 minutes" -> 9000s
+/// - "1 hora 12 minutos e 30 segundos" -> compound
+fn parse_compound_duration(s: &str, keywords: &Keywords) -> Option<i64> {
+    // Try HH:MM or HH:MM:SS format first
+    if let Some(secs) = parse_colon_duration(s) {
+        return Some(secs);
+    }
+
+    // Try natural language: "1 hora e 12 minutos", "2 hours and 30 minutes"
+    if let Some(secs) = parse_natural_compound(s, keywords) {
+        return Some(secs);
+    }
+
+    None
+}
+
+/// Parse "1:12" -> 4320 seconds, "1:30:15" -> 5415 seconds
+fn parse_colon_duration(s: &str) -> Option<i64> {
+    let s = s.trim();
+    let parts: Vec<&str> = s.split(':').collect();
+
+    match parts.len() {
+        2 => {
+            let h: i64 = parts[0].trim().parse().ok()?;
+            let m: i64 = parts[1].trim().parse().ok()?;
+            if m < 0 || m >= 60 { return None; }
+            Some(h * 3600 + m * 60)
+        }
+        3 => {
+            let h: i64 = parts[0].trim().parse().ok()?;
+            let m: i64 = parts[1].trim().parse().ok()?;
+            let sec: i64 = parts[2].trim().parse().ok()?;
+            if m < 0 || m >= 60 || sec < 0 || sec >= 60 { return None; }
+            Some(h * 3600 + m * 60 + sec)
+        }
+        _ => None,
+    }
+}
+
+/// Parse "1 hora e 12 minutos", "2 hours and 30 minutes and 10 seconds"
+fn parse_natural_compound(s: &str, keywords: &Keywords) -> Option<i64> {
+    // Split by "e" or "and" or just whitespace-separated segments
+    let separators = [" e ", " and ", ", "];
+    let segments = split_by_any(s, &separators);
+
+    if segments.len() < 2 {
+        return None; // Single unit handled elsewhere
+    }
+
+    let mut total_secs: i64 = 0;
+    let mut found_any = false;
+
+    for segment in &segments {
+        let seg = segment.trim();
+        if seg.is_empty() {
+            continue;
+        }
+
+        let parts: Vec<&str> = seg.splitn(2, char::is_whitespace).collect();
+        if parts.len() != 2 {
+            return None;
+        }
+
+        let n: i64 = parts[0].parse().ok()?;
+        let unit = parts[1].trim();
+        let unit_secs = unit_to_seconds(unit, keywords);
+        if unit_secs == 0 {
+            return None;
+        }
+
+        total_secs += n * unit_secs;
+        found_any = true;
+    }
+
+    if found_any { Some(total_secs) } else { None }
+}
+
+/// Split string by multiple separators
+fn split_by_any<'a>(s: &'a str, separators: &[&str]) -> Vec<&'a str> {
+    let mut result = vec![s];
+
+    for sep in separators {
+        let mut new_result = Vec::new();
+        for part in &result {
+            for sub in part.split(sep) {
+                if !sub.trim().is_empty() {
+                    new_result.push(sub);
+                }
+            }
+        }
+        result = new_result;
+    }
+
+    result
+}
+
+/// Convert a time unit keyword to seconds
+fn unit_to_seconds(unit: &str, keywords: &Keywords) -> i64 {
+    if keywords.hours.iter().any(|k| unit == *k) {
+        3600
+    } else if keywords.minutes.iter().any(|k| unit == *k) {
+        60
+    } else if keywords.seconds.iter().any(|k| unit == *k) {
+        1
+    } else {
+        0
+    }
+}
+
+/// Format a chrono DateTime as local date+time
+fn format_datetime<Tz: chrono::TimeZone>(dt: &chrono::DateTime<Tz>, keywords: &Keywords) -> String
+where
+    Tz::Offset: std::fmt::Display,
+{
+    if is_pt(keywords) {
+        format!("{:02}/{:02}/{} {:02}:{:02}:{:02}",
+            dt.day(), dt.month(), dt.year(),
+            dt.hour(), dt.minute(), dt.second())
+    } else {
+        format!("{}/{}/{} {:02}:{:02}:{:02}",
+            dt.month(), dt.day(), dt.year(),
+            dt.hour(), dt.minute(), dt.second())
+    }
+}
+
 // === Date format conversion ===
 
 fn try_date_format_conversion(expr: &str, keywords: &Keywords) -> Option<Result<String, String>> {
     let lower = expr.to_lowercase();
 
-    // Patterns: "<date> to BR", "<date> to US", "<date> to ISO", "<date> em BR", etc.
     for conv_kw in keywords.conversion.iter() {
         let patterns = [
             format!(" {} br", conv_kw),
@@ -188,7 +357,6 @@ fn try_date_format_conversion(expr: &str, keywords: &Keywords) -> Option<Result<
                 let date_part = expr[..pos].trim();
                 let target = pattern.split_whitespace().last().unwrap();
 
-                // Parse the input date (with optional time)
                 if let Some((year, month, day, time)) = parse_date_flexible(date_part) {
                     let formatted = match target {
                         "br" | "dd/mm/yyyy" => {
@@ -219,7 +387,6 @@ fn try_date_format_conversion(expr: &str, keywords: &Keywords) -> Option<Result<
                     };
                     return Some(Ok(formatted));
                 } else {
-                    // Not a valid date — don't intercept, let other handlers try
                     continue;
                 }
             }
@@ -232,7 +399,6 @@ fn try_date_format_conversion(expr: &str, keywords: &Keywords) -> Option<Result<
 fn parse_date_flexible(s: &str) -> Option<(i32, u32, u32, Option<(u32, u32, u32)>)> {
     let s = s.trim();
 
-    // Split date and time
     let (date_str, time_str) = if s.contains('T') {
         let parts: Vec<&str> = s.splitn(2, 'T').collect();
         (parts[0], Some(parts[1]))
@@ -247,10 +413,8 @@ fn parse_date_flexible(s: &str) -> Option<(i32, u32, u32, Option<(u32, u32, u32)
         (s, None)
     };
 
-    // Parse date
     let (year, month, day) = parse_date_part(date_str)?;
 
-    // Parse time
     let time = if let Some(t) = time_str {
         parse_time_part(t)
     } else {
@@ -274,7 +438,6 @@ fn parse_date_part(s: &str) -> Option<(i32, u32, u32)> {
     }
 
     if parts[0].len() == 4 {
-        // YYYY-MM-DD
         let y: i32 = parts[0].parse().ok()?;
         let m: u32 = parts[1].parse().ok()?;
         let d: u32 = parts[2].parse().ok()?;
@@ -285,13 +448,10 @@ fn parse_date_part(s: &str) -> Option<(i32, u32, u32)> {
         let y: i32 = parts[2].parse().ok()?;
 
         if first > 12 {
-            // DD/MM/YYYY
             Some((y, second, first))
         } else if second > 12 {
-            // MM/DD/YYYY
             Some((y, first, second))
         } else {
-            // Ambiguous — assume DD/MM/YYYY
             Some((y, second, first))
         }
     } else {
@@ -311,7 +471,7 @@ fn parse_time_part(s: &str) -> Option<(u32, u32, u32)> {
         3 => {
             let h: u32 = parts[0].parse().ok()?;
             let m: u32 = parts[1].parse().ok()?;
-            let s: u32 = parts[2].parse::<f64>().ok()? as u32; // handle "05.000"
+            let s: u32 = parts[2].parse::<f64>().ok()? as u32;
             Some((h, m, s))
         }
         _ => None,
@@ -322,21 +482,14 @@ fn parse_time_part(s: &str) -> Option<(u32, u32, u32)> {
 type DateTuple = (i32, u32, u32);
 
 fn get_today() -> DateTuple {
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as i64;
-
-    // Convert unix timestamp to date (simplified)
-    let days = secs / 86400;
-    unix_days_to_date(days)
+    let now = Local::now();
+    (now.year(), now.month(), now.day())
 }
 
 fn unix_days_to_date(days: i64) -> DateTuple {
-    // Algorithm from http://howardhinnant.github.io/date_algorithms.html
     let z = days + 719468;
     let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
-    let doe = (z - era * 146097) as u32; // day of era
+    let doe = (z - era * 146097) as u32;
     let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
     let y = (yoe as i64 + era * 400) as i32;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
@@ -389,7 +542,6 @@ fn is_leap_year(year: i32) -> bool {
 }
 
 fn format_date(year: i32, month: u32, day: u32, keywords: &Keywords) -> String {
-    // PT-BR: DD/MM/YYYY, EN: M/D/YYYY
     if is_pt(keywords) {
         format!("{:02}/{:02}/{}", day, month, year)
     } else {
@@ -401,19 +553,17 @@ fn is_pt(keywords: &Keywords) -> bool {
     keywords.today.contains(&"hoje")
 }
 
-/// Convert unix timestamp to human-readable date
+/// Convert unix timestamp to human-readable date (local timezone)
 fn try_from_unix(expr: &str, keywords: &Keywords) -> Option<Result<String, String>> {
-    // Match: fromunix(N), fromepoch(N), deunix(N), deepoch(N)
     let prefixes = ["fromunix(", "fromepoch(", "deunix(", "deepoch(", "from_unix(", "from_epoch("];
-    
+
     for prefix in &prefixes {
         if expr.starts_with(prefix) && expr.ends_with(')') {
             let inner = &expr[prefix.len()..expr.len()-1].trim();
             return Some(parse_and_convert_timestamp(inner, keywords));
         }
     }
-    
-    // Also match without parens: "fromunix 1446587186"
+
     let kw_prefixes = ["fromunix ", "fromepoch ", "deunix ", "deepoch "];
     for prefix in &kw_prefixes {
         if expr.starts_with(prefix) {
@@ -421,7 +571,7 @@ fn try_from_unix(expr: &str, keywords: &Keywords) -> Option<Result<String, Strin
             return Some(parse_and_convert_timestamp(inner, keywords));
         }
     }
-    
+
     None
 }
 
@@ -433,42 +583,33 @@ fn parse_and_convert_timestamp(s: &str, keywords: &Keywords) -> Result<String, S
             format!("Invalid timestamp: {}", s)
         }
     })?;
-    
-    // Auto-detect: if > 10^12, it's milliseconds; if > 10^15, microseconds
+
     let secs = if ts > 1_000_000_000_000_000 {
-        ts / 1_000_000 // microseconds
+        ts / 1_000_000
     } else if ts > 1_000_000_000_000 {
-        ts / 1_000 // milliseconds
+        ts / 1_000
     } else {
-        ts // seconds
+        ts
     };
-    
-    let date = unix_days_to_date(secs / 86400);
-    let time_secs = secs % 86400;
-    let hours = time_secs / 3600;
-    let minutes = (time_secs % 3600) / 60;
-    let seconds = time_secs % 60;
-    
-    if is_pt(keywords) {
-        Ok(format!("{:02}/{:02}/{} {:02}:{:02}:{:02} UTC", 
-            date.2, date.1, date.0, hours, minutes, seconds))
-    } else {
-        Ok(format!("{}/{}/{} {:02}:{:02}:{:02} UTC", 
-            date.1, date.2, date.0, hours, minutes, seconds))
-    }
+
+    let dt = Local.timestamp_opt(secs, 0)
+        .single()
+        .ok_or_else(|| "Invalid timestamp".to_string())?;
+
+    Ok(format_datetime(&dt, keywords))
 }
 
 /// Convert a date string to unix timestamp
 fn try_to_unix(expr: &str, _original: &str) -> Option<Result<String, String>> {
     let prefixes = ["tounix(", "toepoch(", "paraunix(", "paraepoch(", "to_unix(", "to_epoch("];
-    
+
     for prefix in &prefixes {
         if expr.starts_with(prefix) && expr.ends_with(')') {
             let inner = &expr[prefix.len()..expr.len()-1].trim();
             return Some(parse_date_to_unix(inner));
         }
     }
-    
+
     let kw_prefixes = ["tounix ", "toepoch ", "paraunix ", "paraepoch "];
     for prefix in &kw_prefixes {
         if expr.starts_with(prefix) {
@@ -476,19 +617,20 @@ fn try_to_unix(expr: &str, _original: &str) -> Option<Result<String, String>> {
             return Some(parse_date_to_unix(inner));
         }
     }
-    
+
     None
 }
 
 fn parse_date_to_unix(s: &str) -> Result<String, String> {
-    // Use flexible parser that handles date + optional time
     if let Some((year, month, day, time)) = parse_date_flexible(s) {
-        let unix_days = date_to_unix_days(year, month, day);
-        let mut timestamp = unix_days * 86400;
-        if let Some((h, m, sec)) = time {
-            timestamp += (h as i64) * 3600 + (m as i64) * 60 + (sec as i64);
-        }
-        Ok(timestamp.to_string())
+        let (h, m, sec) = time.unwrap_or((0, 0, 0));
+        let naive = NaiveDate::from_ymd_opt(year, month, day)
+            .and_then(|d| d.and_hms_opt(h, m, sec))
+            .ok_or_else(|| "Data inválida".to_string())?;
+        let local_dt = Local.from_local_datetime(&naive)
+            .single()
+            .ok_or_else(|| "Data inválida para fuso horário local".to_string())?;
+        Ok(local_dt.timestamp().to_string())
     } else {
         Err("Formato esperado: DD/MM/YYYY [HH:MM[:SS]] ou YYYY-MM-DD[THH:MM[:SS]]".to_string())
     }
