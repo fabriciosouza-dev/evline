@@ -311,7 +311,7 @@ impl Engine {
         let pt = self.locale == Locale::PtBr;
         match lower.as_str() {
             "hello" | "olá" | "ola" => Some(("Hello, World! 👋".to_string(), None)),
-            "evline" => Some(("❤️ v0.3.0".to_string(), None)),
+            "evline" => Some(("❤️ v0.3.1".to_string(), None)),
             "credits" | "créditos" | "creditos" => Some((if pt { "Feito com ☕ por Fabricio" } else { "Made with ☕ by Fabricio" }.to_string(), None)),
             // Star Wars
             "may the force be with you" | "que a força esteja com você" | "que a forca esteja com voce" => {

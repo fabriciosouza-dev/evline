@@ -1,6 +1,6 @@
 {
   "productName": "Evline",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "identifier": "com.evline.app",
   "build": {
     "frontendDist": "../dist",
